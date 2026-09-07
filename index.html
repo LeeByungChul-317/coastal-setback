@@ -298,6 +298,13 @@ button.act:disabled{opacity:.45; cursor:not-allowed}
 const VWORLD_KEY = "8E1CD62A-33A0-4B4F-ACE3-BEC19919B60F";
 const DATA = "data";
 
+/* DATA_VER — data/ 안의 파일을 다시 구울 때마다 이 값을 바꾼다.
+   브라우저는 같은 주소의 json 을 캐시에 담아 두므로, 값을 바꾸지 않으면
+   결과를 새로 올려도 예전 파일이 계속 화면에 나온다. 쿼리스트링만 달라져도
+   다른 주소로 취급되어 새로 받아 간다. */
+const DATA_VER = "20260907d";
+const durl = p => `${DATA}/${p}?v=${DATA_VER}`;
+
 /* ── 색 ─────────────────────────────────────────────────── */
 const C_IN     = "#C0552F";   // 확보 · 위험영역 내
 const C_BEYOND = "#D9A05B";   // 확보 · 위험영역 초과
@@ -342,7 +349,7 @@ let OP = 0.62;             // 필지 채우기 불투명도 (0~1)
 
 /* 분석 방법 —
    "cba"  비용-편익 : 해안선에서 가까운 순서로 예산이 닿는 데까지 (200단계)
-   "meta" 메타휴리스틱 : 목적함수를 최적화해 고른 집합 (20단계, 방법 × 가중치)
+   "meta" 메타휴리스틱 : 목적함수를 최적화해 고른 집합 (40단계, 방법 × 가중치)
    두 방식은 같은 순번(rank) 공간을 쓰므로 필지 지오메트리는 공유한다.        */
 let mode = "cba";
 let algo = "aco", wset = "base";
@@ -420,7 +427,7 @@ function buildLinear(dStar){
 async function boot(){
   let index;
   try{
-    index = await (await fetch(`${DATA}/sites.json`)).json();
+    index = await (await fetch(durl("sites.json"))).json();
   }catch(e){
     $("loading").classList.add("hidden");
     showErr("데이터를 읽지 못했습니다. 이 페이지는 파일을 직접 열면(file://) " +
@@ -440,13 +447,13 @@ async function loadSite(key){
   $("loading").classList.remove("hidden");
   const [m, st, pg, sh, ln] = await Promise.all(
     ["meta.json", "steps.json", "parcels.geojson", "shoreline.geojson", "linear.json"]
-      .map(f => fetch(`${DATA}/${key}/${f}`).then(r => r.json())));
+      .map(f => fetch(durl(`${key}/${f}`)).then(r => r.json())));
   meta = m; steps = st; linear = ln.parcels || [];
 
   // 메타휴리스틱 결과는 일부 대상지에만 있다 (노출량 레이어가 있는 곳)
   mSpec = null; selData = null;
   try{
-    const r = await fetch(`${DATA}/${key}/methods.json`);
+    const r = await fetch(durl(`${key}/methods.json`));
     if (r.ok) mSpec = await r.json();
   }catch(e){ mSpec = null; }
   setupMethodUI();
@@ -512,7 +519,7 @@ function setupMethodUI(){
   } else {
     const w = (mSpec.wsets || []).find(x => x.key === wset);
     note.textContent =
-      `목적함수를 최적화해 필지를 고릅니다. 20단계 · 시드 ${mSpec.n_seeds || 1}회 중 최고해 · `
+      `목적함수를 최적화해 필지를 고릅니다. ${mSpec.n_steps}단계 · 시드 ${mSpec.n_seeds || 1}회 중 최고해 · `
       + `공간 응집 비중 μ=${mSpec.mu}` + (w ? ` · ${w.label || w.name}` : "");
   }
 }
@@ -525,7 +532,7 @@ async function applyMode(reset){
     $("loading").classList.remove("hidden");
     try{
       selData = await (await fetch(
-        `${DATA}/${meta.key}/sel_${algo}_${wset}.json`)).json();
+        durl(`${meta.key}/sel_${algo}_${wset}.json`))).json();
     }catch(e){
       showErr("선택한 방법의 결과 파일을 찾지 못했습니다.");
       mode = "cba"; selData = null;
