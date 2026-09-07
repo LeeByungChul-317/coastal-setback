@@ -5,6 +5,7 @@
  "seed": 20260907,
  "n_seeds": 5,
  "mu": 0.5,
+ "hazard_first": true,
  "used_quantum_pct": 0.5,
  "normalization": "면적당 값(밀도)의 min-max",
  "n_eval": {
@@ -16,29 +17,29 @@
   {
    "key": "aco",
    "name": "개미군집(ACO)",
-   "elapsed_s": 99.2
+   "elapsed_s": 125.1
   },
   {
    "key": "ga",
    "name": "유전(GA)",
-   "elapsed_s": 216.2
+   "elapsed_s": 357.0
   },
   {
    "key": "ts",
    "name": "타부서치(TS)",
-   "elapsed_s": 188.6
+   "elapsed_s": 266.6
   }
  ],
  "wsets": [
   {
    "key": "base",
-   "name": "원고 기준",
+   "name": "동일 가중",
    "w": [
-    0.4,
-    0.3,
-    0.3
+    0.3333333333333333,
+    0.3333333333333333,
+    0.3333333333333333
    ],
-   "label": "인구 0.40 / 개발 0.30 / 종사자 0.30"
+   "label": "인구 0.33 / 개발 0.33 / 종사자 0.33"
   },
   {
    "key": "pop",

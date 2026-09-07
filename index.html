@@ -295,7 +295,7 @@ button.act:disabled{opacity:.45; cursor:not-allowed}
    이 줄만 바꾸면 됩니다. 인증키는 타일 요청 URL에 그대로 실려 나가므로
    숨길 수 없고, 도메인 등록이 유일한 보호 장치입니다.
    ═══════════════════════════════════════════════════════════ */
-const VWORLD_KEY = "5E1B2B48-6DF9-43E5-BD47-157E0F3E9CFF";
+const VWORLD_KEY = "8E1CD62A-33A0-4B4F-ACE3-BEC19919B60F";
 const DATA = "data";
 
 /* ── 색 ─────────────────────────────────────────────────── */
@@ -629,6 +629,7 @@ function updateTextMeta(i, hz, st){
   $("metaBreak").textContent =
     `확보 인구 ${fmt(Math.round(st.pop))}명 · 종사자 ${fmt(Math.round(st.work))}명 · `
     + `개발면적 ${ha(st.dev_area)} · 면적가중 평균거리 ${st.dist_mean_m.toFixed(1)} m`
+    + (st.n_in_haz != null ? ` · 위험영역 안 ${fmt(st.n_in_haz)}필지` : "")
     + ` · 목적값 ${st.val.toFixed(4)}`
     + (st.val_sd != null ? ` (시드 ${st.n_seeds}회 편차 ${st.val_sd.toFixed(5)})` : "");
 
@@ -640,16 +641,20 @@ function updateTextMeta(i, hz, st){
   // 기본 시나리오로 구운 값이므로, 다른 시나리오를 고르면 화면에서 다시 센다
   let over = 0;
   for (const r of st.sel){ const l = rankLayer[r]; if (l && l._d > hz) over++; }
+  const base = `${mSpec.hazard_tag} 기준으로 최적화한 결과입니다.`;
   const note = $("hazNote");
   if (over > 0){
-    note.className = "note";
-    note.textContent = `침식위험영역 초과 — 확보 필지 중 ${fmt(over)}필지가 `
-      + `위험거리 ${hz.toFixed(1)} m 를 넘어섭니다. 메타휴리스틱은 노출량이 큰 `
-      + `필지를 우선하므로 거리순보다 바깥 필지를 더 많이 고릅니다.`;
+    note.className = st.beyond_hazard ? "note ok" : "note";
+    note.textContent = st.beyond_hazard
+      ? `위험영역 안(${fmt(nIn)}필지)을 전부 확보하고, 남은 사업비로 바깥 `
+        + `${fmt(over)}필지까지 넘어갔습니다. ${base}`
+      : `확보 필지 중 ${fmt(over)}필지가 위험거리 ${hz.toFixed(1)} m 를 넘어섭니다. `
+        + `지금 고른 시나리오는 최적화에 쓴 시나리오와 다릅니다 — ${base}`;
   } else {
     note.className = "note ok";
     note.textContent = st.n > 0
-      ? `확보 필지 전부가 침식위험영역(해안선 ${hz.toFixed(1)} m) 안에 있습니다.`
+      ? `확보 필지 전부가 침식위험영역(해안선 ${hz.toFixed(1)} m) 안에 있습니다. `
+        + `위험영역 안을 다 채우기 전에는 바깥으로 넘어가지 않습니다.`
       : `이 사업비로는 확보 가능한 필지가 없습니다.`;
   }
 }
