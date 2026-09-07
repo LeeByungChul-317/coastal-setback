@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>연안침식 완충구역 경계 도출</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* ── 팔레트 (발표자료와 동일) ───────────────────────────── */
+:root{
+  --navy:#12283A; --seablue:#0F5C7A; --teal:#4A9BB5;
+  --coral:#C0552F; --ink:#1B2733; --sand:#D9A05B;
+  --panel-w:340px;
+  --line:rgba(255,255,255,.12);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,
+    "Segoe UI","Malgun Gothic","맑은 고딕",sans-serif;
+  color:#E8EDF2; background:var(--ink); overflow:hidden;
+}
+#map{position:absolute; inset:0; background:var(--navy)}
+
+/* ── 좌측 패널 ─────────────────────────────────────────── */
+#panel{
+  position:absolute; top:0; left:0; bottom:0; width:var(--panel-w); z-index:600;
+  background:rgba(18,40,58,.94); backdrop-filter:blur(10px);
+  border-right:1px solid var(--line);
+  display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain;
+  transition:transform .22s ease;
+}
+#panel.collapsed{transform:translateX(calc(-1 * var(--panel-w)))}
+#toggle{
+  position:absolute; top:14px; left:calc(var(--panel-w) + 12px); z-index:601;
+  width:34px; height:34px; border-radius:8px; cursor:pointer;
+  background:rgba(18,40,58,.94); color:#E8EDF2; border:1px solid var(--line);
+  font-size:16px; line-height:1; transition:left .22s ease;
+}
+#panel.collapsed + #toggle{left:12px}
+#toggle:hover{background:var(--seablue)}
+
+.head{padding:18px 18px 14px; border-bottom:1px solid var(--line)}
+.head h1{margin:0 0 6px; font-size:16px; font-weight:600; letter-spacing:-.01em}
+.head p{margin:0; font-size:11.5px; line-height:1.55; color:#9FB3C4}
+.badge{
+  display:inline-block; margin-bottom:8px; padding:3px 8px; border-radius:4px;
+  background:rgba(74,155,181,.18); color:var(--teal);
+  font-size:10.5px; font-weight:600; letter-spacing:.02em;
+}
+
+section{padding:15px 18px; border-bottom:1px solid var(--line)}
+h2{
+  margin:0 0 10px; font-size:10.5px; font-weight:600; letter-spacing:.07em;
+  color:#7E95A8; text-transform:uppercase;
+}
+label{display:block; font-size:11.5px; color:#9FB3C4; margin-bottom:5px}
+select{
+  width:100%; padding:7px 9px; border-radius:6px; font-size:13px; font-family:inherit;
+  background:rgba(255,255,255,.07); color:#E8EDF2; border:1px solid var(--line);
+}
+select:focus{outline:2px solid var(--teal); outline-offset:1px}
+.row{display:flex; gap:8px}
+.row>div{flex:1; min-width:0}
+
+/* ── 사업비 슬라이더 ───────────────────────────────────── */
+.budget{font-size:25px; font-weight:600; letter-spacing:-.02em; line-height:1.15}
+.budget small{font-size:13px; font-weight:400; color:#9FB3C4; margin-left:3px}
+.pct{font-size:11.5px; color:#7E95A8; margin-top:3px}
+input[type=range]{
+  width:100%; margin:13px 0 0; -webkit-appearance:none; appearance:none;
+  height:4px; border-radius:2px; background:rgba(255,255,255,.16); cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:17px; height:17px; border-radius:50%;
+  background:var(--coral); border:2px solid #fff; cursor:grab;
+}
+input[type=range]::-moz-range-thumb{
+  width:17px; height:17px; border-radius:50%;
+  background:var(--coral); border:2px solid #fff; cursor:grab;
+}
+input[type=range]:focus{outline:none}
+input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(74,155,181,.5)}
+.ticks{display:flex; justify-content:space-between; font-size:10px; color:#63798B; margin-top:5px}
+.numrow{display:flex; align-items:center; gap:7px; margin-top:9px}
+.numrow input[type=range]{flex:1; margin:0}
+input[type=number]{
+  width:78px; flex:none; padding:5px 7px; border-radius:6px; text-align:right;
+  font-size:12.5px; font-family:inherit; font-variant-numeric:tabular-nums;
+  background:rgba(255,255,255,.07); color:#E8EDF2; border:1px solid var(--line);
+}
+input[type=number]:focus{outline:2px solid var(--teal); outline-offset:1px}
+.unit{font-size:11px; color:#7E95A8; flex:none; width:26px}
+
+/* ── 결과 요약 ─────────────────────────────────────────── */
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:11px}
+.stat{background:rgba(255,255,255,.05); border-radius:7px; padding:9px 10px}
+.stat .k{font-size:10.5px; color:#7E95A8; margin-bottom:3px}
+.stat .v{font-size:17px; font-weight:600; letter-spacing:-.01em}
+.stat .v small{font-size:11px; font-weight:400; color:#9FB3C4; margin-left:2px}
+.note{
+  margin-top:11px; padding:9px 11px; border-radius:6px; font-size:11.5px; line-height:1.55;
+  background:rgba(217,160,91,.14); border-left:2px solid var(--sand); color:#EBD3B2;
+}
+.note.ok{background:rgba(74,155,181,.13); border-left-color:var(--teal); color:#BBD9E4}
+
+/* ── 범례 · 레이어 ─────────────────────────────────────── */
+.legend{display:flex; flex-direction:column; gap:7px}
+.legend div{display:flex; align-items:center; gap:8px; font-size:11.5px; color:#B9C9D6}
+.sw{width:15px; height:15px; border-radius:3px; flex:none;
+    border:1px solid rgba(255,255,255,.55); background:transparent}
+.sw.fill{border-color:rgba(255,255,255,.75)}
+.chk{display:flex; align-items:center; gap:8px; font-size:12.5px; color:#D3DEE7; margin-bottom:8px; cursor:pointer}
+.chk input{accent-color:var(--teal); width:14px; height:14px; cursor:pointer}
+
+button.act{
+  width:100%; padding:9px; border-radius:7px; cursor:pointer; font-family:inherit;
+  font-size:12.5px; font-weight:500; color:#E8EDF2;
+  background:var(--seablue); border:1px solid rgba(255,255,255,.15);
+}
+button.act:hover{background:var(--teal); color:var(--navy)}
+button.act:disabled{opacity:.45; cursor:not-allowed}
+
+.disc{padding:15px 18px 22px; font-size:10.5px; line-height:1.65; color:#7E95A8}
+.disc a{color:var(--teal)}
+
+/* ── 지도 위 요소 ──────────────────────────────────────── */
+#attrib{
+  position:absolute; right:0; bottom:0; z-index:600;
+  padding:5px 11px; font-size:10.5px; color:#D3DEE7;
+  background:rgba(18,40,58,.82); border-top-left-radius:6px;
+}
+#attrib a{color:var(--teal)}
+#loading{
+  position:absolute; inset:0; z-index:700; display:flex;
+  align-items:center; justify-content:center; background:rgba(18,40,58,.9);
+  font-size:13px; color:#9FB3C4;
+}
+#loading.hidden{display:none}
+#err{
+  position:absolute; z-index:701; left:50%; top:24px; transform:translateX(-50%);
+  max-width:560px; padding:13px 17px; border-radius:8px; display:none;
+  background:#5A2417; border:1px solid var(--coral); font-size:12.5px; line-height:1.6;
+}
+@media (max-width:760px){
+  :root{--panel-w:100%}
+  #panel{width:100%; max-height:62%; bottom:auto}
+  #panel.collapsed{transform:translateY(-100%)}
+  #toggle{left:auto; right:12px; top:12px}
+  #panel.collapsed + #toggle{left:auto}
+}
+</style>
+</head>
+<body>
+
+<aside id="panel">
+  <div class="head">
+    <span class="badge">SCREENING-LEVEL TOOL</span>
+    <h1>연안침식 완충구역 경계 도출</h1>
+    <p>해안선을 육지 쪽으로 평행 이동시키며, 누적 취득비용이 사업비에 도달하는
+       지점에서 경계를 확정합니다. 개략 검토용 결과이며 법적 효력이 없습니다.</p>
+  </div>
+
+  <section>
+    <h2>대상지</h2>
+    <select id="site"></select>
+  </section>
+
+  <section>
+    <h2>사업비</h2>
+    <div class="budget" id="budgetVal">—</div>
+    <div class="pct" id="budgetPct">&nbsp;</div>
+    <div class="numrow">
+      <input type="range" id="budget" min="0" max="199" value="99" step="1">
+      <input type="number" id="budgetNum" min="0" step="1"><span class="unit">억원</span>
+    </div>
+    <div class="ticks"><span>0</span><span id="tickMax">전액</span></div>
+  </section>
+
+  <section>
+    <h2>결과</h2>
+    <div class="stats">
+      <div class="stat"><div class="k">완충구역 폭</div><div class="v" id="sWidth">—</div></div>
+      <div class="stat"><div class="k">경계 이동한계</div><div class="v" id="sDstar">—</div></div>
+      <div class="stat"><div class="k">확보 필지</div><div class="v" id="sParcels">—</div></div>
+      <div class="stat"><div class="k">확보 면적</div><div class="v" id="sArea">—</div></div>
+    </div>
+    <div class="pct" id="areaBreak" style="margin-top:9px">&nbsp;</div>
+    <div class="note ok" id="hazNote">—</div>
+  </section>
+
+  <section>
+    <h2>침식 시나리오</h2>
+    <div class="row">
+      <div><label for="scen">배출 시나리오</label><select id="scen"></select></div>
+      <div><label for="year">기준 연도</label><select id="year"></select></div>
+    </div>
+    <div class="pct" id="hazDist" style="margin-top:8px">&nbsp;</div>
+  </section>
+
+  <section>
+    <h2>범례</h2>
+    <div class="legend">
+      <div><span class="sw fill" style="background:#C0552F"></span>확보 — 침식위험영역 내</div>
+      <div><span class="sw fill" style="background:#D9A05B"></span>확보 — 위험영역 초과</div>
+      <div><span class="sw fill" style="background:#0F5C7A"></span>선형 국공유지 — 절단 편입 (비용 0)</div>
+      <div><span class="sw fill" style="background:#7A4E8C"></span>선형 사유지 — 편입 시 추가 비용</div>
+      <div><span class="sw"></span>후보 · 미확보</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>레이어</h2>
+    <label class="chk"><input type="checkbox" id="lySat" checked> 위성영상</label>
+    <label class="chk"><input type="checkbox" id="lyHybrid" checked> 지명 · 도로</label>
+    <label class="chk"><input type="checkbox" id="lyShore" checked> 해안선</label>
+    <label class="chk"><input type="checkbox" id="lyCand" checked> 미확보 후보 필지</label>
+    <label class="chk"><input type="checkbox" id="lyLinear" checked> 선형 국공유지 편입분</label>
+    <label for="opacity" style="margin-top:12px">필지 투명도</label>
+    <div class="numrow">
+      <input type="range" id="opacity" min="0" max="100" value="62" step="1">
+      <input type="number" id="opacityNum" min="0" max="100" step="1"><span class="unit">%</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>내려받기</h2>
+    <button class="act" id="dl">확보 필지 경계 (GeoJSON)</button>
+    <div class="pct" style="margin-top:8px">
+      QGIS·ArcGIS 에서 열어 Shapefile 로 저장할 수 있습니다.
+    </div>
+  </section>
+
+  <div class="disc">
+    본 결과는 연구 목적의 시범 분석 결과이며, 법적 효력이나 행정적 구속력이 없습니다.
+    표시되는 완충구역 경계는 해안선으로부터의 평행 이동과 누적 취득비용 상한만을
+    기준으로 산출된 것으로, 실제 토지 수용 대상 및 보상액을 의미하지 않습니다.
+    실제 보상액은 「공익사업을 위한 토지 등의 취득 및 보상에 관한 법률」에 따라
+    수용 시점의 감정평가로 결정됩니다. 필지별 취득비용은 공개하지 않으며, 본 서비스
+    결과물에도 포함되지 않습니다. 지적 경계는 공간정보 참고용이며 실제 경계는
+    지적측량 성과에 따릅니다. 본 결과를 근거로 한 의사결정 및 그로 인한 손해에
+    대하여 연구진은 책임지지 않습니다.
+    <br><br><a href="method.html">분석 방법 · 자주 묻는 질문 →</a>
+  </div>
+</aside>
+
+<button id="toggle" title="패널 접기/펴기" aria-label="패널 접기/펴기">☰</button>
+<div id="map"></div>
+<div id="attrib">배경지도 — <a href="https://www.vworld.kr/" target="_blank" rel="noopener">공간정보 오픈플랫폼(브이월드)</a></div>
+<div id="loading">데이터를 불러오는 중…</div>
+<div id="err"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   설정
+   ─────────────────────────────────────────────────────────
+   VWORLD_KEY — 브이월드 인증키.
+   지금 값은 개발용 키입니다. 배포 도메인이 확정되면 운영용 키를 발급받아
+   이 줄만 바꾸면 됩니다. 인증키는 타일 요청 URL에 그대로 실려 나가므로
+   숨길 수 없고, 도메인 등록이 유일한 보호 장치입니다.
+   ═══════════════════════════════════════════════════════════ */
+const VWORLD_KEY = "8E1CD62A-33A0-4B4F-ACE3-BEC19919B60F";
+const DATA = "data";
+
+/* ── 색 ─────────────────────────────────────────────────── */
+const C_IN     = "#C0552F";   // 확보 · 위험영역 내
+const C_BEYOND = "#D9A05B";   // 확보 · 위험영역 초과
+const C_LINEAR = "#0F5C7A";   // 선형 국공유지 (비용 0) 절단 편입
+const C_LINPAID= "#7A4E8C";   // 선형 사유지 (추가 비용)
+const C_SHORE  = "#4A9BB5";
+
+const S_HIDDEN = {opacity:0, fillOpacity:0};
+const S_CAND   = {color:"#fff", weight:.5, opacity:.34, fillOpacity:0};
+
+/* ── 지도 ───────────────────────────────────────────────── */
+const map = L.map("map", {zoomControl:false, attributionControl:false,
+                          preferCanvas:true, minZoom:6, maxZoom:19});
+L.control.zoom({position:"bottomleft"}).addTo(map);
+
+const vw = (layer, ext) => L.tileLayer(
+  `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/${layer}/{z}/{y}/{x}.${ext}`,
+  {maxNativeZoom:18, maxZoom:19});
+
+const satLayer    = vw("Satellite", "jpeg");
+const hybridLayer = vw("Hybrid", "png");
+const baseLayer   = vw("Base", "png");
+satLayer.addTo(map);
+hybridLayer.addTo(map);
+
+let tileFailed = false;
+satLayer.on("tileerror", () => {
+  if (tileFailed) return;
+  tileFailed = true;
+  showErr("배경지도 타일을 불러오지 못했습니다. 인증키가 유효한지, 그리고 " +
+          "이 도메인이 인증키에 등록되어 있는지 확인해 주세요. " +
+          "지도 배경 없이도 완충구역 분석은 정상 동작합니다.");
+});
+
+/* ── 상태 ───────────────────────────────────────────────── */
+let meta = null, steps = null, linear = [];
+let rankLayer = [];        // rank → layer
+let parcelGroup = null, shoreLayer = null, linearLayer = null;
+let srcFeatures = [];
+let curMax = 0;            // 현재 rank 임계값
+let OP = 0.62;             // 필지 채우기 불투명도 (0~1)
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("ko-KR");
+const showErr = m => { const e = $("err"); e.textContent = m; e.style.display = "block"; };
+
+function won(v){
+  if (v >= 1e12) return [(v/1e12).toFixed(v >= 1e13 ? 1 : 2), "조원"];
+  if (v >= 1e8)  return [fmt(Math.round(v/1e8)), "억원"];
+  return [fmt(Math.round(v)), "원"];
+}
+const ha = a => a >= 1e4 ? `${(a/1e4).toFixed(1)} ha` : `${fmt(Math.round(a))} m²`;
+
+/* ── 슬라이더 ↔ 숫자칸 묶기 ─────────────────────────────── */
+/* 어느 쪽을 만져도 다른 쪽이 따라오고, 숫자칸은 직접 입력할 수 있다. */
+function linkNum(rangeId, numId, toNum, fromNum){
+  const r = $(rangeId), n = $(numId);
+  r.addEventListener("input", () => { n.value = toNum(+r.value); render(); });
+  const apply = () => {
+    if (n.value === "") return;
+    const v = fromNum(parseFloat(n.value));
+    r.value = Math.min(Math.max(v, +r.min), +r.max);
+    n.value = toNum(+r.value);
+    render();
+  };
+  n.addEventListener("change", apply);
+  n.addEventListener("keydown", e => { if (e.key === "Enter") apply(); });
+}
+
+/* ── 삼각형을 경계 d* 로 자르기 ─────────────────────────────
+   선형 국공유지는 폴리곤을 통째로 자를 수 없다(거리 등고선이 볼록하지 않다).
+   대신 미리 삼각형으로 쪼개 두었고, 삼각형 안에서는 거리를 선형으로 볼 수
+   있으므로 여기서 정확히 자를 수 있다. 결과는 삼각형/사각형 조각이다.       */
+function clipTri(P, D, i0, i1, i2, dv, out){
+  const d = [dv[i0], dv[i1], dv[i2]];
+  const p = [P[i0], P[i1], P[i2]];
+  const inside = [d[0] <= D, d[1] <= D, d[2] <= D];
+  const n = (inside[0]?1:0) + (inside[1]?1:0) + (inside[2]?1:0);
+  if (n === 0) return;
+  if (n === 3){ out.push([p[0], p[1], p[2]]); return; }
+  const lerp = (a, b) => {
+    const t = (D - d[a]) / (d[b] - d[a]);
+    return [p[a][0] + t * (p[b][0] - p[a][0]), p[a][1] + t * (p[b][1] - p[a][1])];
+  };
+  if (n === 1){
+    const a = inside[0] ? 0 : inside[1] ? 1 : 2;
+    const b = (a + 1) % 3, c = (a + 2) % 3;
+    out.push([p[a], lerp(a, b), lerp(a, c)]);
+  } else {
+    const c = !inside[0] ? 0 : !inside[1] ? 1 : 2;   // 바깥 꼭짓점
+    const a = (c + 1) % 3, b = (c + 2) % 3;
+    out.push([p[a], p[b], lerp(b, c), lerp(c, a)]);
+  }
+}
+
+function buildLinear(dStar){
+  const free = [], paid = [];
+  for (const par of linear){
+    const out = par.p ? paid : free;
+    const t = par.t;
+    for (let k = 0; k < t.length; k += 3)
+      clipTri(par.xy, dStar, t[k], t[k+1], t[k+2], par.d, out);
+  }
+  return {free, paid};
+}
+
+/* ── 대상지 목록 ────────────────────────────────────────── */
+async function boot(){
+  let index;
+  try{
+    index = await (await fetch(`${DATA}/sites.json`)).json();
+  }catch(e){
+    $("loading").classList.add("hidden");
+    showErr("데이터를 읽지 못했습니다. 이 페이지는 파일을 직접 열면(file://) " +
+            "브라우저 보안 정책 때문에 동작하지 않습니다. web 폴더에서 " +
+            "`python -m http.server` 를 실행한 뒤 http://localhost:8000 으로 접속해 주세요.");
+    return;
+  }
+  const sel = $("site");
+  index.sites.forEach(s => sel.add(new Option(s.name, s.key)));
+  sel.onchange = () => loadSite(sel.value);
+  $("opacity").value = Math.round(OP * 100);
+  $("opacityNum").value = Math.round(OP * 100);
+  await loadSite(index.sites[0].key);
+}
+
+async function loadSite(key){
+  $("loading").classList.remove("hidden");
+  const [m, st, pg, sh, ln] = await Promise.all(
+    ["meta.json", "steps.json", "parcels.geojson", "shoreline.geojson", "linear.json"]
+      .map(f => fetch(`${DATA}/${key}/${f}`).then(r => r.json())));
+  meta = m; steps = st; linear = ln.parcels || [];
+
+  for (const l of [parcelGroup, shoreLayer, linearLayer])
+    if (l) map.removeLayer(l);
+  rankLayer = []; srcFeatures = []; linearLayer = null;
+
+  parcelGroup = L.geoJSON(pg, {
+    interactive:false,                 // 필지 클릭·속성 조회 없음 (요구사항)
+    style:S_CAND,
+    onEachFeature:(f, lyr) => {
+      rankLayer[f.properties.r] = lyr;
+      lyr._d = f.properties.d;
+      srcFeatures.push(f);
+    }
+  }).addTo(map);
+
+  shoreLayer = L.geoJSON(sh, {interactive:false,
+    style:{color:C_SHORE, weight:2.2, opacity:.95}}).addTo(map);
+
+  map.fitBounds([[m.bbox[1], m.bbox[0]], [m.bbox[3], m.bbox[2]]], {padding:[26,26]});
+
+  fillOpts($("scen"), m.hazard.scenarios, m.hazard.default.scenario);
+  fillOpts($("year"), m.hazard.years,     m.hazard.default.year);
+
+  curMax = -1;
+  $("budget").max = steps.budget.length - 1;
+  render();
+  $("loading").classList.add("hidden");
+}
+
+function fillOpts(sel, values, fallback){
+  const keep = sel.value;
+  sel.innerHTML = "";
+  values.forEach(v => sel.add(new Option(v.replace(/^(\d{4})$/, "$1년"), v)));
+  sel.value = values.includes(keep) ? keep : fallback;
+}
+
+/* ── 그리기 ─────────────────────────────────────────────── */
+function render(){
+  if (!meta) return;
+  const i = +$("budget").value;
+  const hz = meta.hazard.m[$("scen").value][$("year").value];
+  const newMax = steps.rank_max[i];
+  OP = (+$("opacity").value) / 100;
+
+  if (render._hz !== hz || render._op !== OP){
+    render._hz = hz; render._op = OP; curMax = -1;
+  }
+  if (curMax === -1){
+    for (let r = 0; r < rankLayer.length; r++) styleRank(r, r < newMax, hz);
+  } else if (newMax > curMax){
+    for (let r = curMax; r < newMax; r++) styleRank(r, true, hz);
+  } else if (newMax < curMax){
+    for (let r = newMax; r < curMax; r++) styleRank(r, false, hz);
+  }
+  curMax = newMax;
+  drawLinear(steps.d_star_m[i]);
+  updateText(i, hz, newMax);
+}
+
+function styleRank(r, on, hz){
+  const l = rankLayer[r];
+  if (!l) return;
+  if (!on){
+    l.setStyle($("lyCand").checked ? S_CAND : S_HIDDEN);
+    return;
+  }
+  l.setStyle({color:"#fff", weight:.6, opacity:Math.min(.75, OP + .15),
+              fillColor:(l._d > hz) ? C_BEYOND : C_IN, fillOpacity:OP});
+}
+
+function drawLinear(dStar){
+  if (linearLayer){ map.removeLayer(linearLayer); linearLayer = null; }
+  if (!$("lyLinear").checked || !linear.length) return;
+  const {free, paid} = buildLinear(dStar);
+  const mk = (rings, color) => rings.length
+    ? L.polygon(rings.map(r => r.map(p => [p[1], p[0]])), {
+        interactive:false, color:color, weight:.4,
+        opacity:Math.min(.6, OP), fillColor:color, fillOpacity:OP})
+    : null;
+  const layers = [mk(free, C_LINEAR), mk(paid, C_LINPAID)].filter(Boolean);
+  if (layers.length){ linearLayer = L.layerGroup(layers).addTo(map); }
+}
+
+function updateText(i, hz, nSel){
+  const b = steps.budget[i], tot = meta.total_cost;
+  const [v, u] = won(b);
+  $("budgetVal").innerHTML = `${v}<small>${u}</small>`;
+  $("budgetPct").textContent =
+    `전체 후보 수용비의 ${(b/tot*100).toFixed(1)}% · 총액 ${won(tot)[0]}${won(tot)[1]}`;
+  $("tickMax").textContent = `${won(tot)[0]}${won(tot)[1]}`;
+  if (document.activeElement !== $("budgetNum"))
+    $("budgetNum").value = Math.round(b / 1e8);
+  $("opacityNum").value = Math.round(OP * 100);
+
+  $("sWidth").innerHTML   = `${fmt(steps.width_m[i])}<small>m</small>`;
+  $("sDstar").innerHTML   = `${fmt(steps.d_star_m[i])}<small>m</small>`;
+  $("sParcels").innerHTML = `${fmt(nSel)}<small>필지</small>`;
+
+  const aPar  = steps.area_m2[i];
+  const aFree = (steps.road_area_m2 || [])[i] || 0;
+  const aPaid = (steps.road_area_paid_m2 || [])[i] || 0;
+  $("sArea").innerHTML = ha(aPar + aFree).replace(/ (ha|m²)/, "<small>$1</small>");
+  $("areaBreak").textContent =
+    `일반 필지 ${ha(aPar)} + 선형 국공유지 ${ha(aFree)}` +
+    (aPaid > 0 ? ` · 선형 사유지 ${ha(aPaid)}는 추가 비용이 들어 제외` : "");
+
+  const tag = `${$("scen").value}|${$("year").value}`;
+  const over = (steps.beyond[tag] || [])[i] || 0;
+  const nIn = meta.hazard.n_in[tag];
+  $("hazDist").textContent =
+    `침식 위험거리 ${hz.toFixed(1)} m · 이 영역에 후보 ${fmt(nIn)}필지`;
+
+  const note = $("hazNote");
+  if (over > 0){
+    note.className = "note";
+    note.textContent = `침식위험영역 초과 — 확보 필지 중 ${fmt(over)}필지가 ` +
+      `위험거리 ${hz.toFixed(1)} m 를 넘어섭니다. 이 부분은 침식 위험 회피 편익으로 ` +
+      `정당화되지 않습니다.`;
+  } else {
+    note.className = "note ok";
+    note.textContent = nSel > 0
+      ? `확보 필지 전부가 침식위험영역(해안선 ${hz.toFixed(1)} m) 안에 있습니다.`
+      : `이 사업비로는 확보 가능한 필지가 없습니다.`;
+  }
+}
+
+/* ── 조작 ───────────────────────────────────────────────── */
+linkNum("budget", "budgetNum",
+        i => meta ? Math.round(steps.budget[i] / 1e8) : 0,
+        v => {                                   // 억원 → 가장 가까운 단계
+          if (!steps) return 0;
+          const target = v * 1e8;
+          let best = 0, bd = Infinity;
+          steps.budget.forEach((b, k) => {
+            const dd = Math.abs(b - target);
+            if (dd < bd){ bd = dd; best = k; }
+          });
+          return best;
+        });
+linkNum("opacity", "opacityNum", v => v, v => v);
+
+$("scen").addEventListener("change", render);
+$("year").addEventListener("change", render);
+
+$("toggle").onclick = () => {
+  $("panel").classList.toggle("collapsed");
+  setTimeout(() => map.invalidateSize(), 240);
+};
+
+$("lySat").onchange    = e => { e.target.checked ? satLayer.addTo(map)
+                                                 : map.removeLayer(satLayer);
+                                if (e.target.checked) map.removeLayer(baseLayer);
+                                else { baseLayer.addTo(map); baseLayer.bringToBack(); } };
+$("lyHybrid").onchange = e => e.target.checked ? hybridLayer.addTo(map)
+                                               : map.removeLayer(hybridLayer);
+$("lyShore").onchange  = e => e.target.checked ? shoreLayer.addTo(map)
+                                               : map.removeLayer(shoreLayer);
+$("lyCand").onchange   = () => { curMax = -1; render(); };
+$("lyLinear").onchange = () => render();
+
+/* ── 내려받기 ───────────────────────────────────────────── */
+$("dl").onclick = () => {
+  const i = +$("budget").value;
+  const hz = meta.hazard.m[$("scen").value][$("year").value];
+  const nSel = steps.rank_max[i];
+  const feats = srcFeatures
+    .filter(f => f.properties.r >= 0 && f.properties.r < nSel)
+    .map(f => ({type:"Feature",
+                properties:{kind:"parcel", rank:f.properties.r,
+                            dist_m:f.properties.d,
+                            in_hazard:f.properties.d <= hz},
+                geometry:f.geometry}));
+  const {free, paid} = buildLinear(steps.d_star_m[i]);
+  for (const [rings, tag] of [[free, "linear_public"], [paid, "linear_private"]])
+    if (rings.length)
+      feats.push({type:"Feature",
+                  properties:{kind:tag, rank:-1, dist_m:null, in_hazard:null},
+                  geometry:{type:"MultiPolygon",
+                            coordinates:rings.map(r => [r.concat([r[0]])])}});
+  const out = {
+    type:"FeatureCollection",
+    crs:{type:"name", properties:{name:"urn:ogc:def:crs:OGC:1.3:CRS84"}},
+    metadata:{
+      site:meta.name,
+      budget_won:steps.budget[i],
+      setback_width_m:steps.width_m[i],
+      frontier_limit_m:steps.d_star_m[i],
+      n_parcels:nSel,
+      area_parcels_m2:steps.area_m2[i],
+      area_linear_public_m2:(steps.road_area_m2 || [])[i] || 0,
+      area_linear_private_m2:(steps.road_area_paid_m2 || [])[i] || 0,
+      hazard_scenario:$("scen").value,
+      hazard_year:$("year").value,
+      hazard_distance_m:hz,
+      note:"연구 목적의 시범 분석 결과이며 법적 효력이 없습니다. " +
+           "필지별 취득비용은 포함되어 있지 않습니다. 선형 국공유지는 경계 " +
+           "위치에서 잘라 편입한 조각이며, 선형 사유지는 추가 비용이 들어 " +
+           "예산에 반영되어 있지 않습니다.",
+      source:"연안침식 완충구역 경계 도출 도구"
+    },
+    features:feats
+  };
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(out)], {type:"application/geo+json"}));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `setback_${meta.key}_${$("scen").value}_${$("year").value}.geojson`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+boot();
+</script>
+</body>
+</html>

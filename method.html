@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>분석 방법 · 자주 묻는 질문 — 연안침식 완충구역</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{--navy:#12283A;--seablue:#0F5C7A;--teal:#4A9BB5;--coral:#C0552F;--ink:#1B2733}
+*{box-sizing:border-box}
+body{
+  margin:0; background:#F4F6F8; color:var(--ink);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,
+    "Segoe UI","Malgun Gothic",sans-serif;
+  line-height:1.72; font-size:15px;
+}
+header{background:var(--navy); color:#E8EDF2; padding:34px 0 30px}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header h1{margin:0 0 8px; font-size:23px; font-weight:600; letter-spacing:-.02em}
+header p{margin:0; color:#9FB3C4; font-size:13.5px}
+header a{color:var(--teal); text-decoration:none; font-size:13px}
+main{padding:34px 0 70px}
+h2{
+  margin:38px 0 12px; font-size:17px; font-weight:600; color:var(--navy);
+  padding-bottom:7px; border-bottom:2px solid var(--teal); letter-spacing:-.01em;
+}
+h3{margin:24px 0 7px; font-size:14.5px; font-weight:600; color:var(--seablue)}
+p{margin:0 0 13px}
+ul{margin:0 0 13px; padding-left:19px}
+li{margin-bottom:6px}
+table{border-collapse:collapse; width:100%; margin:13px 0; font-size:13.5px}
+th,td{border:1px solid #D6DEE5; padding:7px 10px; text-align:left}
+th{background:#E8EDF2; font-weight:600}
+td.n{text-align:right; font-variant-numeric:tabular-nums}
+code{
+  background:#E8EDF2; padding:1px 5px; border-radius:3px;
+  font-size:13px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+}
+.callout{
+  background:#fff; border-left:3px solid var(--coral); padding:14px 17px;
+  margin:17px 0; border-radius:0 6px 6px 0; font-size:14px;
+}
+.callout.info{border-left-color:var(--teal)}
+.faq{background:#fff; border:1px solid #DFE5EA; border-radius:8px;
+     padding:15px 18px; margin-bottom:11px}
+.faq h3{margin:0 0 7px}
+.faq p:last-child{margin-bottom:0}
+footer{border-top:1px solid #DFE5EA; padding:22px 0 44px; font-size:12px; color:#6B7C8A}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <a href="index.html">← 지도로 돌아가기</a>
+  <h1 style="margin-top:12px">분석 방법 · 자주 묻는 질문</h1>
+  <p>연안침식 완충구역 경계 도출 도구</p>
+</div></header>
+
+<main class="wrap">
+
+<div class="callout">
+  <strong>이 도구는 개략 검토용(screening-level)입니다.</strong>
+  완충구역의 대략적인 규모와, 사업비가 늘어날 때 경계가 어떻게 움직이는지를
+  비교해 보기 위한 것입니다. 특정 필지의 수용 여부나 보상액을 정하는 데
+  쓸 수 없습니다.
+</div>
+
+<h2>1. 경계를 정하는 방법</h2>
+<p>
+  해안선을 육지 쪽으로 <strong>1 m 씩 평행 이동</strong>시키면서, 이동한 선에 닿는
+  필지를 차례로 담습니다. 담은 필지의 취득비용을 계속 더해 가다가
+  <strong>사업비에 도달하는 지점에서 멈추고</strong>, 그 위치를 경계로 확정합니다.
+</p>
+<p>
+  실제 계산은 버퍼를 1 m 씩 다시 만드는 대신, 필지마다 해안선까지의 최단거리를
+  한 번만 구한 뒤 거리 순으로 훑습니다.
+  <code>buffer(d)</code> 와 교차하는 필지는 <code>해안선까지 거리 ≤ d</code> 인 필지와
+  수학적으로 같기 때문입니다.
+</p>
+
+<h3>화면에 나오는 두 가지 거리</h3>
+<table>
+  <tr><th>완충구역 폭</th>
+      <td>실제로 확보된 필지 중 가장 먼 필지까지의 거리. 확보한 띠의 실제 폭입니다.</td></tr>
+  <tr><th>경계 이동한계</th>
+      <td>사업비가 허용하는 최대 이동거리. 폭보다 조금 크거나 같습니다.</td></tr>
+</table>
+
+<h2>2. 비용을 어떻게 보았나</h2>
+<p>필지별 취득비용은 네 가지를 더한 값입니다.</p>
+<ul>
+  <li><strong>토지</strong> — 개별공시지가 × 면적</li>
+  <li><strong>건물</strong> — 건축물 가액</li>
+  <li><strong>이주</strong> — 거주 인구에 따른 이주 비용</li>
+  <li><strong>영업손실</strong> — 종사자에 따른 영업 보상</li>
+</ul>
+<p>
+  소유구분이 <strong>국유지</strong>인 필지는 비용을 0 으로 두었습니다. 이미 공공이
+  보유한 땅이라 새로 사들일 필요가 없기 때문입니다. 비용이 0 이라는 이유로
+  국공유지라고 거꾸로 판정하지는 않습니다 — 속성이 비어 있는 필지가 공짜로
+  처리되는 것을 막기 위해서입니다.
+</p>
+
+<div class="callout info">
+  <strong>필지별 비용은 공개하지 않습니다.</strong>
+  이 사이트가 내려받는 파일에는 필지마다 <em>취득 순번</em>만 들어 있고 금액은
+  없습니다. 사업비 슬라이더는 <em>사업비 구간 → 순번 임계값</em> 대응표를 조회할
+  뿐입니다. 대응표도 사업비를 200 단계로 뭉갠 값이라, 뜯어보아도 개별 필지의
+  금액은 복원되지 않습니다.
+</div>
+
+<h2>3. 도로·하천 같은 선형 국공유지</h2>
+<p>
+  도로는 해안선에서 육지 쪽으로 길게 뻗어 있어, 최단거리만으로 판정하면 경계가
+  조금만 움직여도 도로 전체가 통째로 딸려 들어옵니다. 그래서 순서를 나눕니다.
+</p>
+<ul>
+  <li>먼저 <strong>도로를 뺀 일반 필지</strong>로만 경계를 확정하고,</li>
+  <li>확정된 경계 안에 걸친 도로를 <strong>인접 필지의 지적선에 맞춰 잘라</strong> 편입합니다.</li>
+</ul>
+<p>
+  지목이 도로·제방·하천·구거·유지·수도용지이면서, 필지 안에서 해안선까지의 거리
+  차이가 20 m 이상이고 형상이 가늘고 긴 필지를 대상으로 봅니다.
+</p>
+<div class="callout">
+  현재 지도에서 선형 국공유지는 <strong>부분 편입 검토 대상</strong>으로만 표시되며,
+  잘라 넣은 결과는 아직 반영되어 있지 않습니다. 확보 면적에도 포함되지
+  않았습니다.
+</div>
+
+<h2>4. 침식위험영역</h2>
+<p>
+  해안선에서 육지 쪽으로 얼마나 침식이 진행될지를 배출 시나리오(SSP)와 기준 연도별로
+  예측한 거리입니다. 이 거리는 <strong>후보 필지를 잘라내지 않고 표시용 기준으로만</strong>
+  씁니다. 확보한 필지가 이 거리를 넘어가면 "위험영역 초과"로 알려 줍니다.
+</p>
+<p>
+  초과가 곧 잘못이라는 뜻은 아닙니다. 다만 그 부분은 <strong>침식 위험을 피한다는
+  이유만으로는 정당화되지 않으므로</strong>, 다른 근거가 필요하다는 표시입니다.
+</p>
+
+<h2>5. 알아두실 한계</h2>
+<ul>
+  <li>지적 경계는 참고용이며, 실제 경계는 지적측량 성과에 따릅니다.</li>
+  <li>후보 필지는 해안선에서 약 200 m 이내에서 추출했습니다. 이 범위는 자료를 뽑은
+      기준일 뿐 분석 기준이 아니며, 대상지에 따라 조금씩 다릅니다.</li>
+  <li>하천처럼 필지가 없는 구간에서는 확보한 띠가 끊깁니다. 오류가 아니라
+      지적 자료의 성격에서 오는 정상적인 결과입니다.</li>
+  <li>경계 밖에 남은 필지가 도로와 접하지 못하게 되면 잔여지 매수청구가 생길 수
+      있습니다. 이 비용은 여기에 반영되어 있지 않습니다.</li>
+  <li>비용은 <strong>가치의 기준이 아니라 실행 가능성의 잣대</strong>로 쓴 것입니다.
+      비용이 낮은 땅이 덜 중요하다는 뜻이 아닙니다.</li>
+</ul>
+
+<h2>6. 자주 묻는 질문</h2>
+
+<div class="faq">
+  <h3>사업비를 올려도 경계가 움직이지 않습니다.</h3>
+  <p>
+    한 필지가 전체 비용의 큰 몫을 차지하는 곳에서 나타납니다. 그 필지를 살 수 있을
+    만큼 사업비가 모이기 전까지는 경계가 그 앞에서 멈춥니다. 도시 지역에서 흔한
+    형태이며, 자료의 오류가 아닙니다.
+  </p>
+</div>
+
+<div class="faq">
+  <h3>확보한 띠가 중간에 끊겨 있습니다.</h3>
+  <p>
+    하천처럼 지적 필지가 없는 구간입니다. 살 수 있는 필지 자체가 없어 비는 것이며
+    정상입니다.
+  </p>
+</div>
+
+<div class="faq">
+  <h3>특정 필지가 얼마인지 볼 수 있나요?</h3>
+  <p>
+    볼 수 없습니다. 필지별 금액은 이 서비스에 포함되어 있지 않고, 필지를 눌러
+    속성을 조회하는 기능도 두지 않았습니다. 개인 재산에 관한 정보이기 때문입니다.
+  </p>
+</div>
+
+<div class="faq">
+  <h3>내려받은 파일을 Shapefile 로 쓰고 싶습니다.</h3>
+  <p>
+    내려받은 GeoJSON 을 QGIS 나 ArcGIS 에서 연 뒤 Shapefile 로 내보내면 됩니다.
+    좌표계는 WGS84 경위도(EPSG:4326)입니다.
+  </p>
+</div>
+
+<div class="faq">
+  <h3>이 결과대로 수용이 진행되나요?</h3>
+  <p>
+    아닙니다. 연구 목적의 시범 분석이며 행정적 구속력이 없습니다. 실제 보상액은
+    「공익사업을 위한 토지 등의 취득 및 보상에 관한 법률」에 따라 수용 시점의
+    감정평가로 결정됩니다.
+  </p>
+</div>
+
+</main>
+
+<footer class="wrap">
+  배경지도 — 공간정보 오픈플랫폼(브이월드) ·
+  지적 및 공시지가 자료 — 국토교통부<br>
+  본 결과는 연구 목적의 시범 분석 결과이며 법적 효력이나 행정적 구속력이 없습니다.
+</footer>
+
+</body>
+</html>
