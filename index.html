@@ -221,6 +221,7 @@ button.act:disabled{opacity:.45; cursor:not-allowed}
     </div>
     <div class="pct" id="areaBreak" style="margin-top:9px">&nbsp;</div>
     <div class="pct" id="metaBreak">&nbsp;</div>
+    <div class="pct hide" id="stepNote" style="color:#C8A97E"></div>
     <div class="note ok" id="hazNote">—</div>
   </section>
 
@@ -302,7 +303,7 @@ const DATA = "data";
    브라우저는 같은 주소의 json 을 캐시에 담아 두므로, 값을 바꾸지 않으면
    결과를 새로 올려도 예전 파일이 계속 화면에 나온다. 쿼리스트링만 달라져도
    다른 주소로 취급되어 새로 받아 간다. */
-const DATA_VER = "20260907d";
+const DATA_VER = "20260907e";
 const durl = p => `${DATA}/${p}?v=${DATA_VER}`;
 
 /* ── 색 ─────────────────────────────────────────────────── */
@@ -509,6 +510,7 @@ function setupMethodUI(){
   $("statsMeta").classList.toggle("hide", mode !== "meta");
   $("areaBreak").classList.toggle("hide", mode === "meta");
   $("metaBreak").classList.toggle("hide", mode !== "meta");
+  if (mode !== "meta") $("stepNote").classList.add("hide");
 
   const note = $("modeNote");
   if (mode === "cba"){
@@ -632,6 +634,22 @@ function updateTextMeta(i, hz, st){
     ha(st.area_haz_m2).replace(/ (ha|m²)/, "<small>$1</small>");
   $("mParts").innerHTML =
     `${fmt(st.n_parts)}<small>조각 · 최대 ${Math.round(st.largest_ratio*100)}%</small>`;
+
+  // 단계마다 독립으로 최적화하므로, 사업비를 올렸는데 앞 단계의 필지가 빠질 수
+  // 있다. 대개 비싼 필지 하나를 빼고 싼 여러 필지를 사는 맞교환이다. 숨기지 말고
+  // 몇 필지가 빠졌는지 그대로 알린다.
+  const note2 = $("stepNote");
+  let dropped = 0;
+  if (i > 0){
+    const now = new Set(st.sel);
+    for (const r of selData.steps[i - 1].sel) if (!now.has(r)) dropped++;
+  }
+  note2.classList.toggle("hide", dropped === 0);
+  if (dropped > 0)
+    note2.textContent =
+      `⚠ 앞 단계에서 골랐던 ${fmt(dropped)}필지가 이 단계에서는 빠졌습니다. `
+      + `단계마다 독립으로 최적화하기 때문이며, 대개 비싼 필지 하나를 빼고 `
+      + `싼 여러 필지를 사는 맞교환입니다.`;
 
   $("metaBreak").textContent =
     `확보 인구 ${fmt(Math.round(st.pop))}명 · 종사자 ${fmt(Math.round(st.work))}명 · `
