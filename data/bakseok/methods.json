@@ -1,7 +1,7 @@
 {
  "hazard_m": 71.1,
  "hazard_tag": "SSP5-8.5 / 2100년",
- "n_steps": 20,
+ "n_steps": 40,
  "seed": 20260907,
  "n_seeds": 5,
  "mu": 0.5,
@@ -17,17 +17,17 @@
   {
    "key": "aco",
    "name": "개미군집(ACO)",
-   "elapsed_s": 165.0
+   "elapsed_s": 333.7
   },
   {
    "key": "ga",
    "name": "유전(GA)",
-   "elapsed_s": 533.5
+   "elapsed_s": 913.0
   },
   {
    "key": "ts",
    "name": "타부서치(TS)",
-   "elapsed_s": 418.3
+   "elapsed_s": 703.4
   }
  ],
  "wsets": [
